@@ -12,18 +12,16 @@ class NetworkManager:
         self.controller_ip = "10.20.12.30"
         
     def cargar_datos(self, archivo):
-        """Carga datos desde un archivo YAML"""
         with open(archivo, 'r') as file:
             datos = yaml.safe_load(file)
             
-            # Cargar alumnos
             for alumno_data in datos.get('alumnos', []):
                 self.alumnos.append(Alumno(
-                    alumno_data['nombre'],
-                    alumno_data['mac']
+                    n=alumno_data['nombre'],
+                    p=alumno_data['mac'],
+                    c=alumno_data['codigo']
                 ))
             
-            # Cargar servidores
             for servidor_data in datos.get('servidores', []):
                 servicios = []
                 for servicio_data in servidor_data.get('servicios', []):
@@ -38,7 +36,6 @@ class NetworkManager:
                     servicios
                 ))
             
-            # Cargar cursos
             for curso_data in datos.get('cursos', []):
                 alumnos_curso = []
                 for codigo in curso_data.get('alumnos', []):
@@ -59,10 +56,8 @@ class NetworkManager:
                     servidores_curso
                 ))
 
+#PRINCIPAL
     def mostrar_menu_principal(self):
-        """Muestra el menú principal"""
-        print("\n###########")
-        print("Network Policy manager de La UPSM")
         print("###########")
         print("Seleccione una opción:")
         print("1) Importar")
@@ -73,65 +68,7 @@ class NetworkManager:
         print("6) Políticas")
         print("7) Conexiones")
         print("8) Salir")
-
-    def menu_alumnos(self):
-        """Submenú para gestión de alumnos"""
-        while True:
-            print("\n--- GESTIÓN DE ALUMNOS ---")
-            print("1) Listar alumnos")
-            print("2) Mostrar detalle de alumno")
-            print("3) Crear alumno")
-            print("4) Volver al menú principal")
-            
-            opcion = input(">>> ")
-            
-            if opcion == "1":
-                self.listar_alumnos()
-            elif opcion == "2":
-                self.mostrar_detalle_alumno()
-            elif opcion == "3":
-                self.crear_alumno()
-            elif opcion == "4":
-                break
-
-    def listar_alumnos(self):
-        """Lista todos los alumnos"""
-        print("\nListado de alumnos:")
-        for i, alumno in enumerate(self.alumnos, 1):
-            print(f"{i}. {alumno.nombre}")
-
-    def mostrar_detalle_alumno(self):
-        """Muestra detalles de un alumno específico"""
-        self.listar_alumnos()
-        try:
-            idx = int(input("Seleccione un alumno: ")) - 1
-            alumno = self.alumnos[idx]
-            print(f"\nDetalle de {alumno.nombre}:")
-            print(f"- Código: {getattr(alumno, 'codigo', 'No asignado')}")
-            print(f"- MAC: {alumno.pc}")
-            
-            print("\nCursos matriculados:")
-            for curso in self.cursos:
-                if alumno in curso.alumnos:
-                    print(f"- {curso.nombre} ({curso.estado})")
-        except:
-            print("Selección inválida")
-
-    def crear_alumno(self):
-        """Crea un nuevo alumno"""
-        nombre = input("Nombre del alumno: ")
-        codigo = input("Código del alumno: ")
-        mac = input("Dirección MAC: ")
-        
-        nuevo_alumno = Alumno(nombre, mac)
-        nuevo_alumno.codigo = codigo
-        self.alumnos.append(nuevo_alumno)
-        print(f"Alumno {nombre} creado exitosamente!")
-
-    # Implementar métodos similares para cursos, servidores y conexiones
-
-    def menu_principal(self):
-        """Controla el flujo principal de la aplicación"""
+    def menu(self):
         while True:
             self.mostrar_menu_principal()
             opcion = input(">>> ")
@@ -139,8 +76,9 @@ class NetworkManager:
             if opcion == "1":
                 archivo = input("Nombre del archivo a importar: ")
                 self.cargar_datos(archivo)
+                print(f"Datos importados desde {archivo}")
             elif opcion == "2":
-                print("Exportar (a implementar)")
+                print("Exportar")
             elif opcion == "3":
                 self.menu_cursos()
             elif opcion == "4":
@@ -151,10 +89,142 @@ class NetworkManager:
                 self.menu_politicas()
             elif opcion == "7":
                 self.menu_conexiones()
-            elif opcion == "8":
-                print("Saliendo del sistema...")
+            elif opcion == "0":
+                break
+
+#CURSOS
+    def menu_cursos(self):
+        while True:
+            print("\n--- GESTIÓN DE CURSOS ---")
+            print("1) Crear curso")
+            print("2) Listar cursos")
+            print("3) Mostrar detalle de curso")
+            print("4) Actualizar curso")
+            print("5) Borrar curso")
+            print("0) Volver al menú principal")
+            
+            opcion = input(">>> ")
+            
+            if opcion == "2":
+                self.listar_curso()
+            elif opcion == "3":
+                self.mostrar_detalle_curso()
+            elif opcion == "4":
+                self.actualizar_curso()
+            elif opcion == "0":
+                break
+    def listar_curso(self):
+        print("\nListado de cursos:")
+        for i, curso in enumerate(self.cursos, 1):
+            print(f"{i}. {curso.nombre} ({curso.estado})")  
+    def mostrar_detalle_curso(self):
+        self.listar_curso()
+        try:
+            idx = int(input("Seleccione un curso: ")) - 1
+            curso = self.cursos[idx]
+            curso.imprimir()
+        except:
+            print("Selección inválida")
+    def actualizar_curso(self):
+        print("\n--- ACTUALIZAR CURSO ---")
+
+#ALUMNOS
+    def menu_alumnos(self):
+        while True:
+            print("\n--- GESTIÓN DE ALUMNOS ---")
+            print("1) Listar alumnos")
+            print("2) Mostrar detalle de alumno")
+            print("3) Crear alumno")
+            print("0) Volver al menú principal")
+            
+            opcion = input(">>> ")
+            
+            if opcion == "1":
+                self.listar_alumnos()
+            elif opcion == "2":
+                self.mostrar_detalle_alumno()
+            elif opcion == "3":
+                self.crear_alumno()
+            elif opcion == "0":
+                break
+    def listar_alumnos(self):
+        print("\nListado de alumnos:")
+        for i, alumno in enumerate(self.alumnos, 1):
+            print(f"{i}. {alumno.nombre}")
+    def mostrar_detalle_alumno(self):
+        self.listar_alumnos()
+        try:
+            idx = int(input("Seleccione un alumno: ")) - 1
+            alumno = self.alumnos[idx]
+            alumno.imprimir()
+        except:
+            print("Selección inválida")
+    def crear_alumno(self):
+        print("\n--- CREAR ALUMNO ---")
+        nombre = input(">>> Nombre: ")
+        mac = input(">>> PC: ")
+        codigo = input(">>> Código: ")
+        
+        nuevo_alumno = Alumno(n= nombre, p = mac, c= codigo)
+        self.alumnos.append(nuevo_alumno)
+        print(f"Alumno {nombre} creado con éxito.")
+
+#SERVIDORES
+    def menu_servidores(self):
+        while True:
+            print("\n--- GESTIÓN DE SERVIDORES ---")
+            print("1) Crear servidor")
+            print("2) Listar servidores")
+            print("3) Mostrar detalle de servidor")
+            print("4) Actualizar servidor")
+            print("5) Borrar servidor")
+            print("0) Volver al menú principal")
+            
+            opcion = input(">>> ")
+            
+            if opcion == "2":
+                self.listar_servidor()
+            elif opcion == "3":
+                self.mostrar_detalle_servidor()
+            elif opcion == "0":
+                break
+    def listar_servidor(self):
+        print("\nListado de servidores:")
+        for i, servidor in enumerate(self.servidores, 1):
+            print(f"{i}. {servidor.nombre} ({servidor.direccion})")
+    def mostrar_detalle_servidor(self):
+        self.listar_servidor()
+        try:
+            idx = int(input("Seleccione un servidor: ")) - 1
+            servidor = self.servidores[idx]
+            servidor.imprimir()
+        except:
+            print("Selección inválida")
+
+#CONEXIONES
+    def menu_conexiones(self):
+        while True:
+            print("\n--- GESTIÓN DE CONEXIONES ---")
+            print("1) Crear conexión")
+            print("2) Listar conexiones")
+            print("3) Mostrar detalle de conexión")
+            print("4) Recalcular conexión")
+            print("5) Actualizar conexión")
+            print("6) Borrar conexión")
+            
+            opcion = input(">>> ")
+            
+            if opcion == "1":
+                self.listar_conexiones()
+            elif opcion == "2":
+                self.mostrar_detalle_conexion()
+            elif opcion == "3":
+                self.crear_conexion()
+            elif opcion == "4":
                 break
 
 if __name__ == "__main__":
     manager = NetworkManager()
-    manager.menu_principal()
+    print("\n###########")
+    print("Network Policy manager de La UPSM")
+    manager.menu()

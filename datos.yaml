@@ -24,6 +24,7 @@ cursos:
        - codigo: TEL123
          estado: INACTIVO
          nombre: Telepathy and Telekinetics
+         alumnos:
              - 20080621
              - 20041321
          servidores:
