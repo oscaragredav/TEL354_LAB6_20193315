@@ -127,6 +127,32 @@ class NetworkManager:
             print("Selección inválida")
     def actualizar_curso(self):
         print("\n--- ACTUALIZAR CURSO ---")
+        print("1) Agregar alumno")
+        print("2) Eliminar alumno")
+        opcion = input(">>> ")
+        self.listar_curso()
+        try:
+            idx_curso = int(input("Seleccione un curso: ")) - 1
+            curso = self.cursos[idx_curso]
+            self.listar_alumnos()
+            idx_alumno = int(input("Seleccione un alumno: ")) - 1
+            alumno = self.alumnos[idx_alumno]
+            if opcion == "1":
+                if alumno not in curso.alumnos:
+                    curso.agregar_alumno(alumno)
+                    print(f"Alumno {alumno.nombre} agregado al curso {curso.nombre}.")
+                else:
+                    print("El alumno ya está en el curso.")
+            elif opcion == "2":
+                if alumno in curso.alumnos:
+                    curso.eliminar_alumno(alumno)
+                    print(f"Alumno {alumno.nombre} eliminado del curso {curso.nombre}.")
+                else:
+                    print("El alumno no está en el curso.")
+            else:
+                print("Opción inválida.")
+        except:
+            print("Selección inválida")
 
 #ALUMNOS
     def menu_alumnos(self):
