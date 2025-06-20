@@ -3,13 +3,108 @@ import requests
 from ej2 import Alumno, Servicio, Servidor, Curso
 from ej4 import get_attachment_points, get_route
 
+def alumno_autorizado(alumno, servidor_nombre, servicio_nombre, cursos):
+    for curso in cursos:
+        if curso.estado == "DICTANDO" and alumno in curso.alumnos:
+            for servidor in curso.servidores:
+                if servidor.nombre == servidor_nombre:
+                    servicios = [s.nombre for s in servidor.servicios]
+                    if servicio_nombre in servicios:
+                        return True
+    return False
+
+def get_attachment_points(mac_address):
+    url = f"http://10.20.12.30:8080/wm/device/"
+    response = requests.get(url)
+    devices = response.json()
+
+    for device in devices:
+        if device['mac'][0].lower() == mac_address.lower():
+            ap = device.get('attachmentPoint', [])
+            if ap:
+                dpid = ap[0].get('switchDPID')
+                print(f"DPID: {dpid}")
+                port = ap[0].get('port')
+                print(f"Puerto: {port}")
+                return dpid, port
+
+    print(f"No se encontró la MAC")
+    return None
+
+def get_route(src_dpid, src_port, dst_dpid, dst_port):
+    url = f"http://10.20.12.30:8080/wm/topology/route/{src_dpid}/{src_port}/{dst_dpid}/{dst_port}/json"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print(f"Error en la API")
+        return []
+
+    path = response.json()
+    ruta = [(hop['switch'], hop['port']) for hop in path]
+    return ruta
+
+def build_route(route, alumno, servidor, servicio):
+    mac_src = alumno.pc 
+    ip_dst = servidor.ip
+    puerto_l4 = servicio.puerto
+    protocolo = servicio.protocolo.upper()
+    proto_num = "0x06" if protocolo == "TCP" else "0x11"  
+
+    for i in range(len(route)-1):
+        dpid, out_port = route[i]
+
+        flow = {
+            "switch": dpid,
+            "name": f"fwd_{i}_{alumno.codigo}",
+            "priority": "32768",
+            "eth_type": "0x0800",
+            "eth_src": mac_src,
+            "ipv4_dst": ip_dst,
+            "ip_proto": proto_num,
+            f"{protocolo.lower()}_dst": puerto_l4,
+            "active": "true",
+            "actions": f"output={out_port}"
+        }
+        enviar_flujo(flow)
+
+        flow_back = {
+            "switch": dpid,
+            "name": f"bwd_{i}_{alumno.codigo}",
+            "priority": "32768",
+            "eth_type": "0x0800",
+            "eth_dst": mac_src,
+            "ipv4_src": ip_dst,
+            "ip_proto": proto_num,
+            f"{protocolo.lower()}_src": puerto_l4,
+            "active": "true",
+            "actions": f"output={out_port}"
+        }
+        enviar_flujo(flow_back)
+
+        arp = {
+            "switch": dpid,
+            "name": f"arp_{i}_{alumno.codigo}",
+            "eth_type": "0x0806",
+            "priority": "32769",
+            "actions": f"output={out_port}"
+        }
+        enviar_flujo(arp)
+
+def enviar_flujo(flow):
+    url = "http://10.20.12.30:8080/wm/staticflowentrypusher/json"
+    response = requests.post(url, json=flow)
+    if response.status_code == 200:
+        print(f"Flow enviado: {flow['name']}")
+    else:
+        print(f"Error al enviar flow: {response.text}")
+
 class NetworkManager:
     def __init__(self):
         self.alumnos = []
         self.cursos = []
         self.servidores = []
         self.conexiones = []
-        self.controller_ip = "10.20.12.30"
+        
         
     def cargar_datos(self, archivo):
         with open(archivo, 'r') as file:
@@ -217,7 +312,7 @@ class NetworkManager:
     def listar_servidor(self):
         print("\nListado de servidores:")
         for i, servidor in enumerate(self.servidores, 1):
-            print(f"{i}. {servidor.nombre} ({servidor.direccion})")
+            print(f"{i}. {servidor.nombre} ({servidor.ip})")
     def mostrar_detalle_servidor(self):
         self.listar_servidor()
         try:
@@ -237,17 +332,74 @@ class NetworkManager:
             print("4) Recalcular conexión")
             print("5) Actualizar conexión")
             print("6) Borrar conexión")
+            print("0) Volver al menú principal")
             
             opcion = input(">>> ")
             
             if opcion == "1":
-                self.listar_conexiones()
-            elif opcion == "2":
-                self.mostrar_detalle_conexion()
-            elif opcion == "3":
                 self.crear_conexion()
-            elif opcion == "4":
+            elif opcion == "2":
+                self.listar_conexiones()
+            elif opcion == "6":
+                self.borrar_conexion()
+            elif opcion == "0":
                 break
+    
+    def crear_conexion(self):
+        try:
+            self.listar_alumnos()
+            idx_a = int(input("Seleccione alumno: ")) - 1
+            alumno = self.alumnos[idx_a]
+
+            self.listar_servidor()
+            idx_s = int(input("Seleccione servidor: ")) - 1
+            servidor = self.servidores[idx_s]
+
+            print("Servicios disponibles:")
+            for i, servicio in enumerate(servidor.servicios, 1):
+                print(f"{i}) {servicio.nombre}")
+            idx_sv = int(input("Seleccione servicio: ")) - 1
+            servicio = servidor.servicios[idx_sv]
+
+            if not alumno_autorizado(alumno, servidor.nombre, servicio.nombre, self.cursos):
+                print("Acceso denegado: alumno no autorizado para el servicio.")
+                return
+
+            ap_alumno = get_attachment_points(alumno.mac)
+            ap_servidor = get_attachment_points("fa:16:3e:a1:dd:54")  
+
+            if not ap_alumno or not ap_servidor:
+                print("Error al obtener puntos de conexión")
+                return
+
+            ruta = get_route(ap_alumno[0], ap_alumno[1], ap_servidor[0], ap_servidor[1])
+
+            if not ruta:
+                print("No se encontró ruta")
+                return
+
+            build_route(ruta, alumno, servidor, servicio)
+            self.conexiones.append((alumno, servidor, servicio))
+            print("Conexión creada exitosamente.")
+        except Exception as e:
+            print(f"Error al crear la conexión: {str(e)}")
+
+    def listar_conexiones(self):
+        print("\nConexiones activas:")
+        for i, (alumno, servidor, servicio) in enumerate(self.conexiones, 1):
+            print(f"{i}. {alumno.nombre} -> {servidor.nombre} ({servicio.nombre})")
+
+    def borrar_conexion(self):
+        self.listar_conexiones()
+        try:
+            idx = int(input("Seleccione una conexión para borrar: ")) - 1
+            if 0 <= idx < len(self.conexiones):
+                del self.conexiones[idx]
+                print("Conexión borrada exitosamente.")
+            else:
+                print("Selección inválida.")
+        except ValueError:
+            print("Entrada no válida. Debe ser un número.")
 
 if __name__ == "__main__":
     manager = NetworkManager()
